@@ -16,18 +16,6 @@ type Task = {
   update_at: string;
 };
 
-// async function deleteTask(id: string) {
-//   const confirmDelete = confirm("คุณต้องการลบงานนี้หรือไม่?");
-//   if (confirmDelete) {
-//     const { error } = await supabase.from("task_tb").delete().eq("id", id);
-//     if (error) {
-//       alert('พบปัญหาในการลบข้อมูลจาก Supabase');
-//       console.log(error.message);
-//     }
-//     window.location.reload();
-//   }
-// }
-
 export default function Page() {
   //สร้างตัวแปร state สำหรับเก็บข้อมูลจาก supabase
   const [Tasks, setTasks] = useState<Task[]>([]);
@@ -35,13 +23,15 @@ export default function Page() {
   //เนื้อหาถูกโหลด ให้ดึงข้อมูลจาก supabase มาแสดงที่หน้าเพจ
   useEffect(() => {
     async function fetchTasks() {
-      const { data, error} = await supabase
+      const { data, error } = await supabase
         .from("task_tb")
-        .select("id, title, detail, is_completed, image_url, created_at, update_at")
+        .select(
+          "id, title, detail, is_completed, image_url, created_at, update_at"
+        )
         .order("created_at", { ascending: false });
 
       if (error) {
-        alert('พบปัญหาในการดึงข้อมูลจาก Supabase');
+        alert("พบปัญหาในการดึงข้อมูลจาก Supabase");
         console.log(error.message);
         return;
       }
@@ -54,13 +44,42 @@ export default function Page() {
     fetchTasks();
   }, []);
 
+  //ฟังก์ชันลบงาน
+  async function handleDeleteTaskClick(id: string, image_url: string) {
+    //แสดง confirm dialog เพื่อให้ผู้ใช้ยืนยันการลบงาน
+    if (confirm("คุณต้องการลบงานนี้หรือไม่?")) {
+      //ลบรูปออกจาก storage (ถ้ามี)
+      if (image_url != "") {
+        const image_name = image_url.split("/").pop() as string;
+        //ลบรูปออกจาก storage
+        await supabase.storage
+          .from("task_bk")
+          .remove([image_name])
+
+      }
+      //ลบข้อมูลออกจากตาราง supabase
+      const { data, error } = await supabase
+        .from("task_tb")
+        .delete()
+        .eq("id", id);
+      if (error) {
+        alert("พบปัญหาในการลบข้อมูลจาก Supabase");
+        console.log(error.message);
+        return;
+      }
+      //ลบข้อมูลออกจากรายการที่แสดงตรงหน้าจอ
+      setTasks(Tasks.filter((task) => task.id !== id));
+    }
+
+    
+  }
   return (
-    <div className="flex flex-col w-10/12 mx-auto">
-      <div className="flex flex-col items-center mt-20">
-        <Image src={task} alt="Task App" width={150} height={150} priority />
-        <h1 className="text-2xl font-bold mt-10">Manage Task App</h1>
-      </div>
-      <div className="flex justify-end">
+      <div className="flex flex-col w-10/12 mx-auto">
+        <div className="flex flex-col items-center mt-20">
+          <Image src={task} alt="Task App" width={150} height={150} priority />
+          <h1 className="text-2xl font-bold mt-10">Manage Task App</h1>
+        </div>
+        <div className="flex justify-end">
           <Link
             href="addTask"
             className="mt-10 bg-blue-600 text-white font-bold px-5 py-3 rounded hover:bg-blue-700 transition"
@@ -75,30 +94,51 @@ export default function Page() {
             <thead>
               <tr>
                 <th className="border-2 border-black p-2 bg-gray-300">รูป</th>
-                <th className="border-2 border-black p-2 bg-gray-300">งานที่ต้องทำ</th>
-                <th className="border-2 border-black p-2 bg-gray-300">รายละเอียด</th>
+                <th className="border-2 border-black p-2 bg-gray-300">
+                  งานที่ต้องทำ
+                </th>
+                <th className="border-2 border-black p-2 bg-gray-300">
+                  รายละเอียด
+                </th>
                 <th className="border-2 border-black p-2 bg-gray-300">สถานะ</th>
-                <th className="border-2 border-black p-2 bg-gray-300">วันที่เพิ่ม</th>
-                <th className="border-2 border-black p-2 bg-gray-300">วันที่แก้ไข</th>
-                <th className="border-2 border-black p-2 bg-gray-300">Action</th>
+                <th className="border-2 border-black p-2 bg-gray-300">
+                  วันที่เพิ่ม
+                </th>
+                <th className="border-2 border-black p-2 bg-gray-300">
+                  วันที่แก้ไข
+                </th>
+                <th className="border-2 border-black p-2 bg-gray-300">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody>
               {Tasks.map((task) => (
                 <tr key={task.id}>
                   <td className="border-2 border-black p-2">
-                    {task.image_url 
-                      ? <Image src={task.image_url} alt="logo" width={100} height={100} className="mx-auto"/>
-                      : '-'
-                    }
+                    {task.image_url ? (
+                      <Image
+                        src={task.image_url}
+                        alt="logo"
+                        width={100}
+                        height={100}
+                        className="mx-auto"
+                      />
+                    ) : (
+                      "-"
+                    )}
                   </td>
                   <td className="border-2 border-black p-2">{task.title}</td>
                   <td className="border-2 border-black p-2">{task.detail}</td>
                   <td className="border-2 border-black p-2">
                     {task.is_completed ? (
-                      <span className="text-green-600 font-bold">เสร็จสิ้น</span>
+                      <span className="text-green-600 font-bold">
+                        เสร็จสิ้น
+                      </span>
                     ) : (
-                      <span className="text-red-600 font-bold">ยังไม่เสร็จสิ้น</span>
+                      <span className="text-red-600 font-bold">
+                        ยังไม่เสร็จสิ้น
+                      </span>
                     )}
                   </td>
                   <td className="border-2 border-black p-2">
@@ -115,7 +155,14 @@ export default function Page() {
                       >
                         แก้ไข
                       </Link>
-                      <button className="bg-red-600 text-white font-bold px-4 py-2 rounded hover:bg-red-700 transition">ลบ</button>
+                      <button
+                        onClick={() =>
+                          handleDeleteTaskClick(task.id, task.image_url)
+                        }
+                        className="bg-red-600 text-white font-bold px-4 py-2 rounded hover:bg-red-700 transition cursor-pointer"
+                      >
+                        ลบ
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -124,9 +171,10 @@ export default function Page() {
           </table>
         </div>
         <div className="flex justify-center mt-10">
-          <Link href="/" className="text-blue-600 font-bold">กลับไปหน้าแรก</Link>
+          <Link href="/" className="text-blue-600 font-bold">
+            กลับไปหน้าแรก
+          </Link>
         </div>
-
-    </div>
-  );
+      </div>
+    );
 }

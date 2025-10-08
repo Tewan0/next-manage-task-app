@@ -4,8 +4,12 @@ import Image from "next/image";
 import task from "../../assets/task.png";
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Page() {
+  const router = useRouter();
+
   //สร้างตัวแปร state สำหรับเก็บข้อมูลจากฟอร์ม
   const [title, setTitle] = useState<string>("");
   const [detail, setDetail] = useState<string>("");
@@ -27,7 +31,61 @@ export default function Page() {
   //ฟังก์ชันอัปโหลดรูปไปเก็บที่ Supabase Storage
   async function handleUploadAndSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    alert('อัปโหลดรูปและบันทึกข้อมูลเรียบร้อย');
+    //อัปโหลดรูป
+    //สร้างตัวแปรเพื่อเก็บ url ของรูปที่อัปโหลด เพื่อเอาไปบันทึกลงตาราง
+    let image_url = "";
+
+    //ตรวจสอบว่ามีการเลือกไฟล์รูปหรือไม่
+    if (image_file) {
+      const new_image_file_name = `${Date.now()}-${image_file.name}`;
+
+      //อัปโหลดรูปไปเก็บที่ Supabase Storage
+      const { data, error } = await supabase.storage
+        .from("task_bk")
+        .upload(new_image_file_name, image_file);
+
+      //หลังจากอัปโหลดรูปไปยัง storage ให้ตรวจสอบว่าสำเร็จหรือไม่
+      //มี error แสดง Alert หากไม่มี error ให้ get url ของรูปที่อัปโหลดมาเก็บไว้ในตัวแปร image_url
+      if (error) {
+        alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ");
+        console.log(error.message);
+        return;
+      } else {
+        const { data } = supabase.storage
+          .from("task_bk")
+          .getPublicUrl(new_image_file_name);
+
+        image_url = data.publicUrl;
+      }
+    }
+
+    //บันทึกข้อมูลลงตาราง task_tb
+    const { data, error } = await supabase
+      .from("task_tb")
+      .insert({
+        title: title,
+        detail: detail,
+        is_completed: is_completed,
+        image_url: image_url,
+      })
+
+    //ตรวจสอบการบันทึกข้อมูล
+    if (error) {
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+      console.log(error.message);
+      return;
+    } else {
+      alert("บันทึกข้อมูลเรียบร้อย");
+      //เคลียร์ข้อมูลในฟอร์ม
+      setTitle("");
+      setDetail("");
+      setIsCompleted(false);
+      setImageFile(null);
+      setPreviewFile("");
+      image_url = "";
+      //แล้ว re-direct ไปหน้าตารางงาน
+      router.push("/allTask");
+    }
   }
 
 
@@ -53,12 +111,12 @@ export default function Page() {
           <form onSubmit={handleUploadAndSave}>
             <div>
               <label htmlFor="title" className="text-lg font-bold mb-2 block">งานที่ต้องทำ</label>
-              <input id="title" type="text" className="w-full border-2 border-gray-300 rounded-lg p-2" />
+              <input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border-2 border-gray-300 rounded-lg p-2" />
             </div>
 
             <div>
               <label htmlFor="detail" className="text-lg font-bold mb-2 block">รายละเอียดงาน</label>
-              <textarea id="detail" className="w-full border-2 border-gray-300 rounded-lg p-2"></textarea>
+              <textarea id="detail" value={detail} onChange={(e) => setDetail(e.target.value)} className="w-full border-2 border-gray-300 rounded-lg p-2"></textarea>
             </div>
 
             <div className="flex flex-col">
@@ -77,7 +135,10 @@ export default function Page() {
 
             <div>
               <label htmlFor="status" className="text-lg font-bold mb-2 block">สถานะงาน</label>
-              <select id="status" className="w-full border-2 border-gray-300 rounded-lg p-2">
+              <select id="status"
+                value={is_completed ? "1" : "0"}
+                onChange={(e) => setIsCompleted(e.target.value === "1")}
+                className="w-full border-2 border-gray-300 rounded-lg p-2">
                   <option value="0">ยังไม่เสร็จสิ้น</option>
                   <option value="1">เสร็จสิ้น</option>
               </select>
@@ -88,6 +149,9 @@ export default function Page() {
             </div>
           </form>
 
+        </div>
+        <div className="flex justify-center mt-10">
+          <Link href="/allTask" className="text-blue-600 font-bold">กลับไปหน้าตารางงาน</Link>
         </div>
     </div>
   );
